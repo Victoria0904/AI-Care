@@ -55,11 +55,11 @@
 | 能力 | 选型 | 理由 |
 |---|---|---|
 | LLM | 智谱 GLM-4-Flash | 中文医疗语料强、API 稳定、合规清晰；Flash 版延迟低适合 10h demo |
-| ASR | react-native-voice（on-device） | iOS Speech / Android SpeechRecognizer，无 API key、无音频文件、低延迟；赛后换讯飞医疗 ASR 流式版（医疗术语准确率提升） |
+| ASR | mosi.cn 多说话人转写（云端 API） | `POST /v1/audio/transcriptions`（model=moss-transcribe-diarize, diarize=true, stream=true SSE），说话人分离 S01=医生/S02=患者；客户端直连 demo 妥协（赛后迁服务端中转）。原方案 react-native-voice on-device 已弃用——医疗术语准确率与说话人分离需云端模型 |
 
-> 演示阶段用 mock JSON 兜底，避免现场 ASR / LLM 抖动翻车。
+> 演示阶段用 mock JSON 兜底，避免现场 LLM 抖动翻车；ASR 已接真实 mosi.cn 接口（MOSS_API_KEY 已配置即走真实）。
 
-> ⚠️ `react-native-voice` 包含原生模块，需运行 `npx expo prebuild` 切换到 Expo Development Build，无法用 Expo Go 扫码。MVP 阶段保留 30 分钟做 prebuild + native 首次构建。
+> ⚠️ ASR 依赖 `expo-av`（录音）+ `react-native-sse`（SSE 流式），均含原生模块，需运行 `npx expo prebuild` 切换到 Expo Development Build，无法用 Expo Go 扫码。MVP 阶段保留 30 分钟做 prebuild + native 首次构建。
 
 ## 3. 项目目录结构
 
@@ -99,7 +99,9 @@ ai_companion_app/
 │   │   ├── useChat.ts                # 多轮对话 hook
 │   │   └── chatClient.ts             # 调 chief_complaint_chat Edge Function
 │   ├── transcription/
-│   │   ├── useLiveASR.ts            # react-native-voice 实时 ASR hook
+│   │   ├── useLiveASR.ts            # 实时 ASR hook（按 ASR_USE_REAL 分流 mock/真实）
+│   │   ├── asrClient.ts             # mosi.cn 转写封装：上传 + SSE 流式 + 同步降级
+│   │   ├── useRecorder.ts           # expo-av 录音 hook
 │   │   ├── asrPublisher.ts          # 转写片段写入 DB + Realtime 推送
 │   │   └── mockASR.ts               # USE_MOCK 时定时推送预置片段
 │   ├── summary/
@@ -112,7 +114,8 @@ ai_companion_app/
 │
 ├── lib/
 │   ├── supabase.ts                   # Supabase client 单例
-│   └── constants.ts                  # env、API URL、USE_MOCK 开关
+│   ├── llmClient.ts                  # 智谱 GLM-4-Flash 直连封装（客户端 demo 妥协）
+│   └── constants.ts                  # env、API URL、USE_MOCK/ASR_USE_REAL/LLM_USE_REAL 开关
 │
 ├── hooks/
 │   ├── useQuery.ts                   # TanStack Query 简化封装
@@ -402,36 +405,31 @@ MVP 阶段不使用 Storage（无音频文件、无图片，头像用 emoji 字�
 |---|---|---|
 | 演示用患者账号 | 比赛前预注册 2 个测试账号 | demo 时直接登录 |
 | 主诉对话首条 AI 提问 | 硬编码开场白 | LLM 抖动也能开场 |
-| 实时 ASR 失败兜底 | 预置 `sample-transcript-segments.json` 数组，定时器每 1.5 秒推送一段 | 模拟实时转写效果 |
+| 实时 ASR 失败兜底 | 预置 `MOCK_TRANSCRIPT_SCRIPT` 数组（mockASR.ts），定时器每 1.5 秒推送一段 | 模拟实时转写效果。**注：MOSS_API_KEY 已配置后 ASR 走真实 mosi.cn 接口，mock 仅作未配 key 时兜底** |
 | GLM 摘要失败兜底 | 预置 `sample-summary.json` | 一键切换 mock 模式 |
 | 家属端历史通知 | mock 1 条"昨日已生成摘要" | 让家属端 home 不空 |
 | 用户头像 | 用 emoji 字符代替图片 | 🧓 👩 |
 
 ### 实现方式
 
-在 `lib/constants.ts` 加 `USE_MOCK` 常量。`useLiveASR` hook 在 mock 模式下用定时器推送预置片段，真实模式下订阅 react-native-voice 事件：
+在 `lib/constants.ts` 加 `USE_MOCK` 常量。ASR 与 LLM 各有独立真实开关：
+
+- `ASR_USE_REAL`：`MOSS_API_KEY` 已配置且非占位符时为 true，ASR 走真实 mosi.cn
+- `LLM_USE_REAL`：`ZHIPU_API_KEY` 已配置且非占位符时为 true，LLM 走真实智谱 GLM
+
+`useLiveASR` hook 按 `ASR_USE_REAL` 分流——mock 模式定时器推送预置片段，真实模式录音→上传→SSE 流式接收：
 
 ```typescript
 // features/transcription/useLiveASR.ts
-import Voice from 'react-native-voice';
+// start() 按 ASR_USE_REAL 分流：
+//   mock  → startMockASR() 定时推送 MOCT_TRANSCRIPT_SCRIPT
+//   real → recorder.startRecording() (expo-av) → stopReal() 上传 mosi.cn → SSE 流式
 
-export function useLiveASR(consultationId: string) {
-  const startListening = () => {
-    if (Constants.USE_MOCK) {
-      // 模拟实时转写：定时器从 sample-transcript-segments.json 推送
-      return startMockSegmentTimer(consultationId);
-    }
-    Voice.start('zh-CN');
-    Voice.on('onSpeechResults', (e) => {
-      pushTranscriptSegment(consultationId, e.value[0], /*is_final=*/true);
-    });
-    Voice.on('onSpeechPartialResults', (e) => {
-      pushTranscriptSegment(consultationId, e.value[0], /*is_final=*/false);
-    });
-  };
-  // ... stop / cleanup 省略
-}
+// features/chat/chatClient.ts、features/summary/summarizeClient.ts
+// 按 LLM_USE_REAL 分流：mock 返回预置脚本/摘要，real 调 lib/llmClient.ts (智谱 GLM-4-Flash)
 ```
+
+> LLM 真实调用封装在 `lib/llmClient.ts`（客户端直连 demo 妥协）；架构正确的服务端中转版本在 `supabase/functions/`（赛后切换，见 §7.1）。
 
 ## 9. 代码规范
 
@@ -537,3 +535,4 @@ USE_MOCK=false
 |---|---|---|
 | v0.1 | 2026-08-27 | 黑客松 MVP 初版，定义 5 张表 / 2 个 Edge Function / 3 个 Realtime 事件 |
 | v0.2 | 2026-08-27 | 取消诊中录音，改 on-device ASR 实时转写；`transcripts` 表去掉 `audio_path`，加 `is_final` / `sequence_no`；状态机简化为 5 态；推进顺序压缩到 10h；新增 `transcript_segment` Realtime 事件 |
+| v0.3 | 2026-08-28 | ASR 改 mosi.cn 云端多说话人转写（弃 react-native-voice）：录音用 expo-av，SSE 用 react-native-sse，§2.5/§8 同步；新增 `ASR_USE_REAL`/`LLM_USE_REAL` 独立开关；LLM 真实接入智谱 GLM-4-Flash（lib/llmClient.ts 直连）；建 `supabase/functions/` Edge Function 工程（chief_complaint_chat / consultation_summarize + _shared）作为服务端中转备选 |
