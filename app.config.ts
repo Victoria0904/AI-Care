@@ -10,6 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'light',
   newArchEnabled: false,
   ios: {
+    bundleIdentifier: 'com.aicompanion.app',
     supportsTablet: true,
     // 提前声明权限，step 4 接 react-native-voice 时不用再改
     infoPlist: {
@@ -18,9 +19,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
+    package: 'com.aicompanion.app',
     permissions: ['android.permission.RECORD_AUDIO'],
   },
-  plugins: ['expo-router', 'expo-asset'],
+  plugins: ['expo-router', 'expo-asset', 'expo-av'],
   experiments: {
     tsconfigPaths: true,
   },
