@@ -3,7 +3,7 @@
 // 详见 PRD.md 功能 A：诊前整理主诉 + ARCHITECTURE.md §2.5/§8
 
 import { LLM_USE_REAL, MAX_CHAT_ROUNDS } from '@/lib/constants';
-import { chatComplete, chatJSON, type ChatMessage as LLMMessage } from '@/lib/llmClient';
+import { chatComplete, chatJSON, LlmError, type ChatMessage as LLMMessage } from '@/lib/llmClient';
 import type { ChiefComplaint } from '@/features/consultation/types';
 
 // ===== Mock 对话脚本 =====
@@ -75,8 +75,9 @@ export async function getAiPrompt(round: number, history: string[]): Promise<str
   try {
     const next = await chatComplete(messages, { temperature: 0.7, maxTokens: 120 });
     return next || (MOCK_AI_PROMPTS[round] ?? MOCK_AI_PROMPTS[MOCK_AI_PROMPTS.length - 1]);
-  } catch {
-    // LLM 失败兜底 mock
+  } catch (e) {
+    // LLM 失败：控制台打印结构化错误码（便于现场定位 key/模型/限流），兜底脚本继续
+    if (e instanceof LlmError) console.warn('[chatClient:getAiPrompt] LLM 降级到 mock:', e.code, e.message);
     return MOCK_AI_PROMPTS[round] ?? MOCK_AI_PROMPTS[MOCK_AI_PROMPTS.length - 1];
   }
 }
@@ -107,8 +108,8 @@ export async function summarizeChiefComplaint(userAnswers: string[]): Promise<Ch
           ? result.severity
           : 'moderate',
     };
-  } catch {
-    // LLM 失败兜底 mock
+  } catch (e) {
+    if (e instanceof LlmError) console.warn('[chatClient:summarize] LLM 降级到 mock:', e.code, e.message);
     return mockSummarize(userAnswers);
   }
 }

@@ -6,7 +6,9 @@
     "start": "expo start",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "test:llm": "node scripts/test-llm.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",

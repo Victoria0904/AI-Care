@@ -3,7 +3,7 @@
 // 详见 PRD.md 功能 C 与 ARCHITECTURE.md §2.5/§8
 
 import { LLM_USE_REAL } from '@/lib/constants';
-import { chatJSON, type ChatMessage as LLMMessage } from '@/lib/llmClient';
+import { chatJSON, LlmError, type ChatMessage as LLMMessage } from '@/lib/llmClient';
 import type { ConsultationSummary, ChiefComplaint } from '@/features/consultation/types';
 
 // Mock：预置摘要（LLM 不可用 / 失败兜底）
@@ -74,8 +74,8 @@ export async function generateSummary(
       follow_ups: Array.isArray(result.follow_ups) ? result.follow_ups : [],
       warnings: Array.isArray(result.warnings) ? result.warnings : [],
     };
-  } catch {
-    // LLM 失败兜底 mock
+  } catch (e) {
+    if (e instanceof LlmError) console.warn('[summarizeClient:generateSummary] LLM 降级到 mock:', e.code, e.message);
     return mockGenerate(complaint, transcriptText);
   }
 }
