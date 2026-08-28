@@ -1,6 +1,8 @@
-// 实时 ASR hook：管理转写状态
+// 实时 ASR hook：管理语音识别状态
 // Mock 模式用 mockASR 定时推送预置片段
-// 真实模式（ASR_USE_REAL）用 expo-av 录音 → 上传 mosi.cn → SSE 流式接收多说话人转写
+// 真实模式（ASR_USE_REAL）用 expo-av 采集音频 → 上传 mosi.cn → SSE 流式接收多说话人转写
+// 注：phase 区分 'recording'（采集）/'transcribing'（接收 SSE 文字），
+//     但 UI 层对外统一呈现"语音识别中"，不暴露"录音"概念。
 // 详见 PRD.md 功能 B 与 ARCHITECTURE.md §2.5
 
 import { useCallback, useEffect, useRef, useState } from 'react';

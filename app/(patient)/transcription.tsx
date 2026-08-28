@@ -1,7 +1,9 @@
-// 诊中实时转写页
+// 诊中实时语音识别页
 // Mock 模式：自动启动 mock ASR，预置医患对话逐段推送
-// 真实模式：开始录音 → 停止录音 → 上传 mosi.cn → SSE 流式多说话人转写
+// 真实模式：开始语音识别 → 停止识别 → 上传 mosi.cn → SSE 流式多说话人转写
 // 转写完成后更新状态并跳转摘要页
+// 注：mosi.cn 接口本质是音频文件转写，底层仍需 expo-av 录音采集；
+//     UI 层完全去掉"录音"概念，用户感知是连续 ASR（语音→文字）。
 // 详见 PRD.md 功能 B 与 ARCHITECTURE.md §3 app/(patient)/transcription.tsx
 
 import { useEffect, useRef, useState } from 'react';
@@ -25,7 +27,7 @@ export default function TranscriptionScreen() {
     },
   });
 
-  // Mock 模式进入页面自动开始；真实模式需用户手动点"开始录音"
+  // Mock 模式进入页面自动开始；真实模式需用户手动点"开始语音识别"
   useEffect(() => {
     if (consultationId && !ASR_USE_REAL) {
       updateStatus('transcribing').then(() => start());
@@ -46,21 +48,22 @@ export default function TranscriptionScreen() {
 
   // 上传中全屏 loading
   if (uploading) {
-    return <LoadingScreen message="音频上传中，请稍候..." />;
+    return <LoadingScreen message="语音识别处理中，请稍候..." />;
   }
 
   const statusText = () => {
     if (error) return error;
-    if (phase === 'recording') return '正在录音...说完后点"停止并转写"';
-    if (phase === 'transcribing') return ASR_USE_REAL ? 'AI 转写中，文本逐段出现...' : '正在识别...';
-    if (phase === 'done') return '转写完成';
-    return ASR_USE_REAL ? '点击"开始录音"' : '准备中';
+    // 真实模式下 'recording'（采集音频）+ 'transcribing'（SSE 接收文字）对外都呈现为"识别中"
+    if (phase === 'recording') return '语音识别中...说完后点"结束识别"';
+    if (phase === 'transcribing') return '语音识别中，文本逐段出现...';
+    if (phase === 'done') return '识别完成';
+    return ASR_USE_REAL ? '点击"开始语音识别"' : '准备中';
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>诊中实时转写</Text>
+        <Text style={styles.headerTitle}>诊中语音识别</Text>
         <Text style={[styles.headerSub, error ? styles.errorText : null]}>
           {statusText()}
         </Text>
@@ -78,8 +81,8 @@ export default function TranscriptionScreen() {
         ListEmptyComponent={
           <Text style={styles.empty}>
             {ASR_USE_REAL
-              ? '点击"开始录音"，说完后点"停止并转写"，AI 将自动区分医患对话'
-              : '点击"开始转写"后，医患对话将实时显示在此处'}
+              ? '点击"开始语音识别"，说完后点"结束识别"，AI 将自动区分医患对话'
+              : '点击"开始语音识别"后，医患对话将实时显示在此处'}
           </Text>
         }
       />
@@ -88,13 +91,13 @@ export default function TranscriptionScreen() {
         {phase === 'done' ? (
           <Button onPress={handleGenerateSummary}>生成就诊摘要</Button>
         ) : running && phase === 'recording' ? (
-          <Button onPress={stop} variant="secondary">停止录音并转写</Button>
+          <Button onPress={stop} variant="secondary">结束识别</Button>
         ) : running && phase === 'transcribing' ? (
           <Button onPress={stop} variant="secondary" disabled={!ASR_USE_REAL}>
-            {ASR_USE_REAL ? '等待转写完成...' : '停止转写'}
+            {ASR_USE_REAL ? '识别中...' : '停止识别'}
           </Button>
         ) : (
-          <Button onPress={start}>{ASR_USE_REAL ? '开始录音' : '开始转写'}</Button>
+          <Button onPress={start}>开始语音识别</Button>
         )}
       </View>
     </View>
