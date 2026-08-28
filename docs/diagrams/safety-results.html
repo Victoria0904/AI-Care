@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家庭AI陪诊师 · 医疗安全与测试结果</title>
+  <style>
+    :root {
+      --brand: #7c5cff;
+      --surface: #ffffff;
+      --surface-muted: #f5f6f8;
+      --text-strong: #0f172a;
+      --text-muted: #64748b;
+      --text-faint: #94a3b8;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --radius: 8px;
+      --radius-card: 12px;
+      --radius-full: 999px;
+      --font-sans: -apple-system, system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --brand: #9b80ff;
+        --surface: #1a1d24;
+        --surface-muted: #232730;
+        --text-strong: #f1f5f9;
+        --text-muted: #94a3b8;
+        --text-faint: #64748b;
+        --border: #2c313a;
+        --border-strong: #3a4150;
+      }
+    }
+    body { margin: 0; padding: 24px; background: var(--surface-muted); font-family: var(--font-sans); color: var(--text-strong); }
+    .container { max-width: 1100px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+    h1 { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+    .subtitle { font-size: 11px; color: var(--text-faint); margin: 0 0 12px; }
+    .safe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .quad { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; background: var(--surface); }
+    .quad-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .quad-icon { width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .quad-title { font-size: 16px; font-weight: 600; margin: 0; }
+    .quad-list { list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); }
+    .quad-list li { padding: 3px 0; line-height: 18px; }
+    .quad-list b { color: var(--text-strong); font-weight: 600; }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; margin-right: 4px; }
+    .tag-ok { background: rgba(45,212,191,0.15); color: #0d9488; }
+    .tag-warn { background: rgba(245,158,11,0.15); color: #b45309; }
+    .tag-mock { background: rgba(148,163,184,0.2); color: #475569; }
+    .tag-real { background: rgba(124,92,255,0.15); color: #7c5cff; }
+    .metrics { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    .metric { flex: 1; min-width: 130px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; text-align: center; }
+    .metric-val { font-size: 22px; font-weight: 700; color: #7c5cff; line-height: 26px; }
+    .metric-lab { font-size: 12px; color: var(--text-muted); }
+    .foot { margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+    @media print { body { padding: 0; background: white; } .container { box-shadow: none; } }
+  </style>
+</head>
+<body>
+<div class="container" data-dynamic-ui-widget data-template="decision-cards">
+  <h1>医疗安全 · 隐私保护 · 产品边界 · 关键测试</h1>
+  <p class="subtitle">8 分钟 PITCH 必备 · 评委可一眼看清的合规与可信度证据</p>
+
+  <div class="safe-grid">
+    <div class="quad">
+      <div class="quad-head">
+        <span class="quad-icon" style="background:rgba(220,38,38,0.12);color:#dc2626;">医</span>
+        <p class="quad-title">医疗安全</p>
+      </div>
+      <ul class="quad-list">
+        <li><b>非诊断性</b>：摘要仅供沟通辅助，不替代医生诊断</li>
+        <li><b>不处方决策</b>：药品列表仅整理医嘱原文，不推荐用药</li>
+        <li><b>主诉辅助</b>：5 轮追问帮患者说清症状，医生仍主导</li>
+        <li><b>摘要免责声明</b>：UI 显眼位置标注"仅供参考"</li>
+      </ul>
+    </div>
+
+    <div class="quad">
+      <div class="quad-head">
+        <span class="quad-icon" style="background:rgba(45,212,191,0.15);color:#0d9488;">隐</span>
+        <p class="quad-title">隐私保护</p>
+      </div>
+      <ul class="quad-list">
+        <li><b>国内云服务商</b>：智谱（北京）+ mosi.cn，数据不出境</li>
+        <li><b>Demo 阶段</b>：auth/DB/Realtime 走内存 mock，零真实数据留存</li>
+        <li><b>赛后升级</b>：key 迁 Supabase Edge Function 服务端，不暴露客户端</li>
+        <li><b>RLS 已就绪</b>：migration 已写患者只能查自己就诊记录</li>
+      </ul>
+    </div>
+
+    <div class="quad">
+      <div class="quad-head">
+        <span class="quad-icon" style="background:rgba(245,158,11,0.15);color:#b45309;">界</span>
+        <p class="quad-title">产品使用边界</p>
+      </div>
+      <ul class="quad-list">
+        <li><b>适用场景</b>：老年慢性病陪诊，子女远程了解就诊过程</li>
+        <li><b>不适用</b>：急诊 / 危重症 / 手术决策 / 精神类疾病</li>
+        <li><b>使用前提</b>：患者知情同意 + 医生默许旁听录音</li>
+        <li><b>责任划分</b>：AI 整理 ≠ 医疗建议，最终解释权归医生</li>
+      </ul>
+    </div>
+
+    <div class="quad">
+      <div class="quad-head">
+        <span class="quad-icon" style="background:rgba(124,92,255,0.15);color:#7c5cff;">测</span>
+        <p class="quad-title">关键测试结果</p>
+      </div>
+      <ul class="quad-list">
+        <li><span class="tag tag-ok">PASS</span>LLM 3/3 冒烟（主诉/结构化/摘要）</li>
+        <li><span class="tag tag-ok">PASS</span>药品名提取准确（苯磺酸氨氯地平/倍他司汀）</li>
+        <li><span class="tag tag-ok">PASS</span>schema 字段完整 + 数组类型校验</li>
+        <li><span class="tag tag-mock">MOCK</span>家属端实时推送链路通</li>
+        <li><span class="tag tag-real">REAL</span>4 项真实云端 API 已通</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-val">3/3</div><div class="metric-lab">LLM 真实 API 通过率</div></div>
+    <div class="metric"><div class="metric-val">~1s</div><div class="metric-lab">主诉对话首字延迟</div></div>
+    <div class="metric"><div class="metric-val">~10s</div><div class="metric-lab">摘要生成延迟</div></div>
+    <div class="metric"><div class="metric-val">4 项</div><div class="metric-lab">真实后端接入数</div></div>
+    <div class="metric"><div class="metric-val">0</div><div class="metric-lab">tsc 编译错误</div></div>
+  </div>
+
+  <p class="foot">v0.2 · commit 6774798 · 真机测试就绪 · 演示链路 100% 可跑（真实 AI + mock 基础设施分层）</p>
+</div>
+</body>
+</html>

@@ -167,3 +167,57 @@ flowchart TD
 |---|---|---|
 | v0.1 | 2026-08-27 | 黑客松 MVP 初版，定义功能 A/B/C 与范围决策 |
 | v0.2 | 2026-08-27 | 取消诊中录音，改为 on-device ASR 实时转写；更新流程与范围决策；演示时间从 48h 压缩到 10h |
+| v0.3 | 2026-08-28 | 比赛版 Agent 叙事重构：3 个核心功能（诊前主诉/诊中转写/诊后摘要）包装为 3 个 Agent 角色；新增 §9 Agent 叙事与产品边界；ASR 实际选型改为 mosi.cn 多说话人云端 API（弃 on-device）；配套产出 `docs/diagrams/` + `docs/pitch-script.md` |
+
+## 9. Agent 叙事与产品边界（比赛版）
+
+> 本章把 §3 的 3 个 MVP 功能包装为 3 个 Agent 角色，便于评委一眼理解「这个项目有 3 个 AI Agent 协作覆盖诊前/诊中/诊后」。代码层不引入新依赖，仅重构呈现方式。
+
+### 9.1 3 Agent 职责
+
+| Agent | 阶段 | 核心能力 | 技术选型 |
+|---|---|---|---|
+| **Agent 1 · 主诉澄清** | 诊前 | 5 轮多轮提问帮老年患者说清症状 → 结构化 `ChiefComplaint` | 智谱 GLM-4-Flash（json_object） |
+| **Agent 2 · 语音转写** | 诊中 | 多说话人分离（S01=医生/S02=患者）+ SSE 流式转写 | mosi.cn moss-transcribe-diarize |
+| **Agent 3 · 摘要生成** | 诊后 | 结构化 `ConsultationSummary`（诊断/医嘱/药品/复诊/注意事项） | 智谱 GLM-4-Flash（json_object） |
+
+每个 Agent 含「数据来源 → 算法逻辑 → 工具调用 → 结构化输出」四件套，详见 [ARCHITECTURE.md §13](./ARCHITECTURE.md#13-agent-协作架构比赛版叙事)。
+
+### 9.2 医疗安全边界
+
+- **非诊断性**：摘要仅供沟通辅助，不替代医生诊断
+- **不处方决策**：药品列表仅整理医嘱原文，不推荐用药
+- **主诉辅助**：5 轮追问帮患者说清症状，医生仍主导问诊
+- **摘要免责声明**：UI 显眼位置标注「AI 整理仅供参考，请以医嘱原件为准」
+
+### 9.3 隐私保护
+
+- **国内云服务商**：智谱（北京）+ mosi.cn，数据全程不出境
+- **Demo 阶段**：auth/DB/Realtime 走内存 mock，零真实数据留存
+- **赛后升级**：key 迁 Supabase Edge Function 服务端，不暴露客户端
+- **RLS 已就绪**：migration 已写患者只能查自己就诊记录
+
+### 9.4 产品使用边界
+
+| 维度 | 描述 |
+|---|---|
+| **适用场景** | 老年慢性病陪诊，子女远程了解就诊过程 |
+| **不适用** | 急诊 / 危重症 / 手术决策 / 精神类疾病 |
+| **使用前提** | 患者知情同意 + 医生默许旁听录音 |
+| **责任划分** | AI 整理 ≠ 医疗建议，最终解释权归医生 |
+
+### 9.5 关键测试结果（v0.2）
+
+| 状态 | 项 |
+|---|---|
+| ✅ PASS | LLM 3/3 冒烟（主诉/结构化/摘要） |
+| ✅ PASS | 药品名提取准确（苯磺酸氨氯地平/倍他司汀） |
+| ✅ PASS | schema 字段完整 + 数组类型校验 |
+| 🟣 REAL | 4 项真实云端 API 已通（ASR + 3 LLM 链路） |
+| ⚪ MOCK | 家属端实时推送链路通（赛后切 Supabase Realtime） |
+
+### 9.6 比赛版架构图与逐字稿
+
+- 主架构图：[`docs/diagrams/agent-architecture.md`](./docs/diagrams/agent-architecture.md) / `.html`
+- 安全边界 + 测试结果图：[`docs/diagrams/safety-results.md`](./docs/diagrams/safety-results.md) / `.html`
+- 8 分钟 PITCH 逐字稿：[`docs/pitch-script.md`](./docs/pitch-script.md)

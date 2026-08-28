@@ -536,3 +536,55 @@ USE_MOCK=false
 | v0.1 | 2026-08-27 | 黑客松 MVP 初版，定义 5 张表 / 2 个 Edge Function / 3 个 Realtime 事件 |
 | v0.2 | 2026-08-27 | 取消诊中录音，改 on-device ASR 实时转写；`transcripts` 表去掉 `audio_path`，加 `is_final` / `sequence_no`；状态机简化为 5 态；推进顺序压缩到 10h；新增 `transcript_segment` Realtime 事件 |
 | v0.3 | 2026-08-28 | ASR 改 mosi.cn 云端多说话人转写（弃 react-native-voice）：录音用 expo-av，SSE 用 react-native-sse，§2.5/§8 同步；新增 `ASR_USE_REAL`/`LLM_USE_REAL` 独立开关；LLM 真实接入智谱 GLM-4-Flash（lib/llmClient.ts 直连）；建 `supabase/functions/` Edge Function 工程（chief_complaint_chat / consultation_summarize + _shared）作为服务端中转备选 |
+| v0.4 | 2026-08-28 | 比赛版 Agent 叙事重构：3 个 AI 调用包装为 3 个 Agent 角色（主诉澄清 / 语音转写 / 摘要生成），每个 Agent 含「数据来源 → 算法逻辑 → 工具调用 → 结构化输出」四件套；UI 完全去掉"录音"概念词统一为"语音识别"；新增 §13 Agent 协作架构；配套产出 `docs/diagrams/` 4 个图文件（HTML+MD）+ `docs/pitch-script.md` 8 分钟逐字稿 |
+
+## 13. Agent 协作架构（比赛版叙事）
+
+> 本章用于比赛 PITCH 与评委沟通，把 §4 核心模块 + §6 数据流包装为 **3 Agent 串联叙事**。代码层不引入新依赖，沿用 §4 features/* 现有结构，仅重构呈现方式。
+
+### 13.1 3 Agent 职责拆解
+
+| Agent | 阶段 | 算法逻辑 | 工具/调用 | 输入 | 输出 | 实现位置 |
+|---|---|---|---|---|---|---|
+| **Agent 1 · 主诉澄清** | 诊前 | 多轮提问 5 轮 + `response_format=json_object` + schema 字段兜底 | GLM-4-Flash `chatComplete` + `chatJSON` | 患者主诉文本 | `ChiefComplaint` | `features/chat/chatClient.ts` |
+| **Agent 2 · 语音转写** | 诊中 | 说话人分离（S01=医生/S02=患者）+ SSE 流式逐段返回 + m4a 上传 → file_id → SSE | mosi.cn `moss-transcribe-diarize` + expo-av 采集 | 医生/患者语音流 | 分段转写文本 `{speaker, text, start, end}[]` | `features/transcription/asrClient.ts` + `useRecorder.ts` |
+| **Agent 3 · 摘要生成** | 诊后 | `ConsultationSummary` schema + 药品/复诊提取 + 数组字段强制类型转换 | GLM-4-Flash `chatJSON` | Agent 2 输出转写文本 | `ConsultationSummary` | `features/summary/summarizeClient.ts` |
+
+### 13.2 数据来源
+
+| 数据源 | 用途 | 处理 Agent |
+|---|---|---|
+| 患者主诉文本（键盘输入） | 多轮追问 + 结构化主诉 | Agent 1 |
+| 医生/患者语音流（麦克风采采集 m4a） | 多说话人分离 + SSE 流式转写 | Agent 2 |
+| Agent 2 输出转写文本 | 结构化摘要生成 | Agent 3 |
+| mock 病史记录 | 暂未实现，赛后接入 | — |
+
+### 13.3 协作流程（状态机推进）
+
+`consultation.status` 推进即 Agent 协作交接：
+
+```
+chief_complaint_pending → chief_complaint_done → transcribing → summarizing → completed
+        ↓                         ↓                       ↓                ↓
+     Agent 1                   Agent 1 完成              Agent 2         Agent 3
+     主导                     触发 Agent 2              主导            主导 → 推送家属端
+```
+
+每个状态对应一个 Agent 主导，状态推进 = Agent 交接。
+
+### 13.4 双端实时同步
+
+| 通道 | 当前实现 | 赛后升级 |
+|---|---|---|
+| 患者端 → 家属端转写文本 | `asrPublisher` → mockStore 订阅 | Supabase Realtime channel `consultation:{id}` |
+| 摘要完成通知 | mockStore 写入触发 | Realtime broadcast `summary_ready` |
+
+### 13.5 比赛版架构图
+
+完整图源见 [`docs/diagrams/agent-architecture.md`](./docs/diagrams/agent-architecture.md) 与 [`docs/diagrams/safety-results.md`](./docs/diagrams/safety-results.md)（含 HTML 版可直接嵌 PPT）。
+
+### 13.6 焦点
+
+每个 Agent 内含「数据来源 → 算法逻辑 → 工具调用 → 结构化输出」四件套。3 Agent 横向串联 + 状态机推进 + 双端实时同步 = 比赛版主架构。
+
+> 注：当前为单线性状态机驱动，非多 Agent 自主编排。未来 v1.0 演进可引入 `lib/agentRouter.ts` 根据上下文动态调度 Agent，现有 chatClient/asrClient/summarizeClient 沉为 Agent 内部工具调用。
