@@ -80,7 +80,8 @@ function classifyError(httpStatus: number, detail: string, error?: { code?: stri
 }
 
 function authHeaders(): Record<string, string> {
-  if (!Constants.ZHIPU_API_KEY) throw new LlmError('NO_KEY', '未配置 ZHIPU_API_KEY，请检查 .env 里的 EXPO_PUBLIC_ZHIPU_API_KEY');
+  if (!Constants.ZHIPU_API_KEY || /^your-|请填入/.test(Constants.ZHIPU_API_KEY))
+    throw new LlmError('NO_KEY', '未配置 ZHIPU_API_KEY，请检查 .env 里的 EXPO_PUBLIC_ZHIPU_API_KEY');
   return {
     'Content-Type': 'application/json',
     Accept: 'application/json',

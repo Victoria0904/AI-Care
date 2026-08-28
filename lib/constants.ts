@@ -66,8 +66,9 @@ export const ASR_USE_REAL =
 // USE_MOCK=true 时 auth/DB 仍走 mock，仅 LLM 由 key 决定（与 ASR 同策略）
 export const LLM_USE_REAL =
   !!Constants.ZHIPU_API_KEY &&
-  Constants.ZHIPU_API_KEY !== '请填入你的ZHIPU_API_KEY' &&
-  Constants.ZHIPU_API_KEY !== 'your-zhipu-api-key';
+  !/^(your-zhipu-api-key|your-glm-api-key|请填入你的ZHIPU_API_KEY|请填入你的GLM_API_KEY)$/.test(
+    Constants.ZHIPU_API_KEY
+  );
 
 // 业务常量
 export const MAX_CHAT_ROUNDS = 5; // 诊前主诉对话最大轮数
