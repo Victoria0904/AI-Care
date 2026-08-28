@@ -116,7 +116,8 @@ export function transcribeStream(fileId: string, callbacks: AsrCallbacks): () =>
     es.close();
   });
 
-  es.open();
+  // 注：react-native-sse 的 EventSource 构造时已自动启动连接
+  // （_pollAgain → 500ms 后 open()），此处不能再调 es.open()，否则会重复连接
   return () => es.close();
 }
 

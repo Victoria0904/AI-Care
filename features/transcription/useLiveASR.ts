@@ -3,7 +3,7 @@
 // 真实模式（ASR_USE_REAL）用 expo-av 录音 → 上传 mosi.cn → SSE 流式接收多说话人转写
 // 详见 PRD.md 功能 B 与 ARCHITECTURE.md §2.5
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ASR_USE_REAL } from '@/lib/constants';
 import { publishTranscript } from './asrPublisher';
 import { startMockASR, type MockSegment } from './mockASR';
@@ -33,7 +33,9 @@ export function useLiveASR({ consultationId, onDone }: UseLiveASROptions) {
   const [uploading, setUploading] = useState(false);
 
   const recorder = useRecorder();
-  let stopFn: (() => void) | null = null;
+  // 用 useRef 持有取消函数：组件函数体局部变量每次渲染重置，
+  // 叠加 recorder 依赖每次变化导致 useCallback 重建，会让闭包里的 stopFn 丢失。
+  const stopFnRef = useRef<(() => void) | null>(null);
 
   // 发布转写片段到 DB/Realtime + 更新本地列表
   const handleSegment = useCallback(
@@ -53,7 +55,7 @@ export function useLiveASR({ consultationId, onDone }: UseLiveASROptions) {
     if (!consultationId || running) return;
     setRunning(true);
     setPhase('transcribing');
-    stopFn = startMockASR(
+    stopFnRef.current = startMockASR(
       async (seg: MockSegment) => {
         await handleSegment(seg.content, seg.speaker);
       },
@@ -66,8 +68,8 @@ export function useLiveASR({ consultationId, onDone }: UseLiveASROptions) {
   }, [consultationId, running, handleSegment, onDone]);
 
   const stopMock = useCallback(() => {
-    stopFn?.();
-    stopFn = null;
+    stopFnRef.current?.();
+    stopFnRef.current = null;
     setRunning(false);
     setPhase('done');
   }, []);
@@ -98,7 +100,7 @@ export function useLiveASR({ consultationId, onDone }: UseLiveASROptions) {
       const fileId = await uploadAudioFile(uri);
       // 2. SSE 流式接收转写结果
       setUploading(false);
-      stopFn = transcribeStream(fileId, {
+      stopFnRef.current = transcribeStream(fileId, {
         onSegment: async (seg) => {
           await handleSegment(seg.text, seg.speaker);
         },
@@ -135,7 +137,7 @@ export function useLiveASR({ consultationId, onDone }: UseLiveASROptions) {
 
   // 卸载时清理
   useEffect(() => {
-    return () => stopFn?.();
+    return () => stopFnRef.current?.();
   }, []);
 
   return {
