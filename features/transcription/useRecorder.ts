@@ -7,6 +7,7 @@
 // 注：expo-av 含原生模块，需 npx expo prebuild 后用 Expo Development Build 运行
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 
 export function useRecorder() {
@@ -16,18 +17,27 @@ export function useRecorder() {
   const [error, setError] = useState<string | null>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
 
+  // Web 平台不支持 expo-av 原生录音采集，直接返回不可用状态
+  // 演示用真机跑 ASR；web 部署仅展示已识别文本与 LLM 链路
+  const isWeb = Platform.OS === 'web';
+
   // 请求麦克风权限（首次使用时）
   const ensurePermission = useCallback(async () => {
+    if (isWeb) return false;
     if (hasPermission === true) return true;
     const { status } = await Audio.requestPermissionsAsync();
     const granted = status === 'granted';
     setHasPermission(granted);
     if (!granted) setError('未获得麦克风权限，无法进行语音识别');
     return granted;
-  }, [hasPermission]);
+  }, [hasPermission, isWeb]);
 
   // 开始采集（语音识别启动）
   const startRecording = useCallback(async () => {
+    if (isWeb) {
+      setError('语音识别需在真机运行，web 端不可用');
+      return;
+    }
     setError(null);
     const ok = await ensurePermission();
     if (!ok) return;
@@ -51,10 +61,11 @@ export function useRecorder() {
       setError(msg);
       setIsRecording(false);
     }
-  }, [ensurePermission]);
+  }, [ensurePermission, isWeb]);
 
   // 停止采集，返回音频文件 URI（供 ASR 上传转写）
   const stopRecording = useCallback(async (): Promise<string | null> => {
+    if (isWeb) return null;
     const recording = recordingRef.current;
     if (!recording) return null;
     try {
@@ -71,7 +82,7 @@ export function useRecorder() {
       recordingRef.current = null;
       return null;
     }
-  }, []);
+  }, [isWeb]);
 
   // 卸载时清理
   useEffect(() => {
@@ -84,7 +95,7 @@ export function useRecorder() {
 
   return {
     isRecording,
-    hasPermission,
+    hasPermission: isWeb ? false : hasPermission,
     audioUri,
     error,
     startRecording,

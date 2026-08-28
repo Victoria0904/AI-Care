@@ -23,6 +23,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     permissions: ['android.permission.RECORD_AUDIO'],
   },
   plugins: ['expo-router', 'expo-asset', 'expo-av'],
+  // Web 部署：纯 SPA 模式（跳过 SSR）
+  // 原因：react-native-sse + @supabase/supabase-js 在 import 顶层访问 window，
+  //       SSR(Node 渲染) 阶段会 ReferenceError；SPA 模式浏览器执行时 window 已存在
+  web: {
+    output: 'single',
+    bundler: 'metro',
+  },
   experiments: {
     tsconfigPaths: true,
   },

@@ -7,7 +7,7 @@
 // 详见 PRD.md 功能 B 与 ARCHITECTURE.md §3 app/(patient)/transcription.tsx
 
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { ASR_USE_REAL } from '@/lib/constants';
 import { useLiveASR } from '@/features/transcription/useLiveASR';
@@ -15,6 +15,9 @@ import { useConsultation } from '@/features/consultation/useConsultation';
 import { TranscriptBubble } from '@/components/transcript/TranscriptBubble';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
+
+// web 平台 ASR 不可用（expo-av 原生录音采集）→ 仅显示提示与跳转
+const IS_WEB = Platform.OS === 'web';
 
 export default function TranscriptionScreen() {
   const { consultationId, updateStatus } = useConsultation();
@@ -90,6 +93,10 @@ export default function TranscriptionScreen() {
       <View style={styles.footer}>
         {phase === 'done' ? (
           <Button onPress={handleGenerateSummary}>生成就诊摘要</Button>
+        ) : IS_WEB ? (
+          <Button onPress={handleGenerateSummary} variant="secondary">
+            跳过 ASR，直接查看摘要演示
+          </Button>
         ) : running && phase === 'recording' ? (
           <Button onPress={stop} variant="secondary">结束识别</Button>
         ) : running && phase === 'transcribing' ? (
@@ -100,6 +107,13 @@ export default function TranscriptionScreen() {
           <Button onPress={start}>开始语音识别</Button>
         )}
       </View>
+      {IS_WEB && (
+        <View style={styles.webBanner}>
+          <Text style={styles.webBannerText}>
+            Web 端不支持麦克风采集，语音识别需真机运行。可跳过此步直接查看摘要演示。
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -146,5 +160,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+  },
+  webBanner: {
+    padding: 12,
+    backgroundColor: '#fef3c7',
+    borderTopWidth: 1,
+    borderTopColor: '#f59e0b',
+  },
+  webBannerText: {
+    fontSize: 12,
+    color: '#92400e',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

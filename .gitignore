@@ -20,6 +20,9 @@ expo-env.d.ts
 ios/
 android/
 
+# Web build output (Vercel builds in CI, not committed)
+dist/
+
 # Native
 *.orig.*
 *.jks
